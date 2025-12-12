@@ -1,0 +1,5 @@
+app.env
+.env
+cmd/server/app.env
+go.mod
+go.sum
