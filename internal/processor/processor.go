@@ -4,50 +4,52 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"dynamic-pricing-tool-ru/internal/api"
 	"dynamic-pricing-tool-ru/internal/types"
 )
 
 type Processor struct {
-	apiClient      api.APIClient
+	combinedClient *api.CombinedAPIClient
 	chunkSize      int
 	workerPoolSize int
 }
 
-func NewProcessor(apiClient api.APIClient, chunkSize int) *Processor {
+func NewProcessorWithClients(getchipsClient *api.GetchipsClient, efindClient *api.EfindClient, chunkSize int) *Processor {
+	combinedClient := api.NewCombinedAPIClient(getchipsClient, efindClient)
 	return &Processor{
-		apiClient:      apiClient,
+		combinedClient: combinedClient,
 		chunkSize:      chunkSize,
 		workerPoolSize: 20,
 	}
 }
 
-func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]types.APIResponse, error) {
-	// Extract part data from request
+func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]types.CombinedResult, error) {
 	parts, err := p.extractPartData(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// Создаем контекст с отменой
+	if len(parts) == 0 {
+		return []types.CombinedResult{}, nil
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Создаем каналы
 	jobs := make(chan types.PartData, len(parts))
-	resultsChan := make(chan types.APIResponse, len(parts))
+	resultsChan := make(chan types.CombinedResult, len(parts))
 
 	var wg sync.WaitGroup
 
-	// Запускаем воркеры
-	for w := 0; w < p.workerPoolSize; w++ {
+	for i := 0; i < p.workerPoolSize; i++ {
 		wg.Add(1)
 		go p.worker(ctx, jobs, resultsChan, &wg)
 	}
 
-	// Отправляем задания в канал
 	go func() {
 		for _, part := range parts {
 			select {
@@ -59,14 +61,12 @@ func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]t
 		close(jobs)
 	}()
 
-	// Закрываем канал результатов после завершения всех воркеров
 	go func() {
 		wg.Wait()
 		close(resultsChan)
 	}()
 
-	// Собираем результаты
-	var allResults []types.APIResponse
+	var allResults []types.CombinedResult
 	for result := range resultsChan {
 		allResults = append(allResults, result)
 	}
@@ -74,7 +74,7 @@ func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]t
 	return allResults, nil
 }
 
-func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, results chan<- types.APIResponse, wg *sync.WaitGroup) {
+func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, results chan<- types.CombinedResult, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for part := range jobs {
@@ -82,25 +82,59 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 		case <-ctx.Done():
 			return
 		default:
-			qty, _ := strconv.Atoi(part.Quantity)
-			if qty == 0 {
-				qty = 1
+			qty := p.parseQuantity(part.Quantity)
+
+			apiResult := p.combinedClient.SearchAllAPIs(ctx, part.PartNumber, qty)
+
+			simplifiedGetchips := FormatGetchipsData(apiResult.GetchipsData, part.PartNumber)
+			simplifiedEfind := FormatEfindData(apiResult.EfindData)
+
+			combinedResult := types.CombinedResult{
+				PartNumber:   part.PartNumber,
+				RequestedQty: qty,
+				RowIndex:     part.RowIndex,
+				Getchips:     simplifiedGetchips,
+				Efind:        simplifiedEfind,
+				GetchipsRaw:  apiResult.GetchipsData,
+				EfindRaw:     apiResult.EfindData,
+				Timestamp:    time.Now().Format(time.RFC3339),
 			}
 
-			// Синхронный вызов для упрощения
-			data, err := p.apiClient.SearchPart(ctx, part.PartNumber, qty)
+			if apiResult.GetchipsErr != nil {
+				combinedResult.GetchipsError = apiResult.GetchipsErr.Error()
+			}
 
+			if apiResult.EfindErr != nil {
+				combinedResult.EfindError = apiResult.EfindErr.Error()
+			}
+
+			// Отправляем результат
 			select {
 			case <-ctx.Done():
 				return
-			case results <- types.APIResponse{
-				PartNumber: part.PartNumber,
-				Data:       data,
-				Error:      err,
-			}:
+			case results <- combinedResult:
 			}
 		}
 	}
+}
+
+func (p *Processor) parseQuantity(quantityStr string) int {
+	if quantityStr == "" {
+		return 1
+	}
+
+	quantityStr = strings.TrimSpace(quantityStr)
+
+	qty, err := strconv.Atoi(quantityStr)
+	if err != nil {
+		return 1
+	}
+
+	if qty <= 0 {
+		return 1
+	}
+
+	return qty
 }
 
 func (p *Processor) extractPartData(req *types.Request) ([]types.PartData, error) {
@@ -110,54 +144,49 @@ func (p *Processor) extractPartData(req *types.Request) ([]types.PartData, error
 
 	var parts []types.PartData
 
-	// Skip header row (index 0)
+	partNumberIndex := -1
+	quantityIndex := -1
+
+	for key, value := range req.Mapping {
+		switch value {
+		case "partNumber":
+			if idx, err := strconv.Atoi(key); err == nil {
+				partNumberIndex = idx
+			}
+		case "quantity":
+			if idx, err := strconv.Atoi(key); err == nil {
+				quantityIndex = idx
+			}
+		}
+	}
+
+	if partNumberIndex == -1 {
+		return nil, fmt.Errorf("partNumber mapping not found")
+	}
+
 	for i := 1; i < len(req.Data); i++ {
 		row := req.Data[i]
-		if len(row) < 2 {
+
+		if len(row) <= partNumberIndex {
 			continue
 		}
 
-		part := types.PartData{
-			PartNumber: row[0], // MPN
-			Quantity:   row[1], // Qty
+		partNumber := strings.TrimSpace(row[partNumberIndex])
+		if partNumber == "" {
+			continue
 		}
-		parts = append(parts, part)
+
+		quantity := ""
+		if quantityIndex != -1 && len(row) > quantityIndex {
+			quantity = strings.TrimSpace(row[quantityIndex])
+		}
+
+		parts = append(parts, types.PartData{
+			PartNumber: partNumber,
+			Quantity:   quantity,
+			RowIndex:   i,
+		})
 	}
 
 	return parts, nil
-}
-
-func (p *Processor) splitIntoChunks(parts []types.PartData, chunkSize int) [][]types.PartData {
-	var chunks [][]types.PartData
-
-	for i := 0; i < len(parts); i += chunkSize {
-		end := i + chunkSize
-		if end > len(parts) {
-			end = len(parts)
-		}
-		chunks = append(chunks, parts[i:end])
-	}
-
-	return chunks
-}
-
-func (p *Processor) processChunk(ctx context.Context, chunk []types.PartData, results chan<- types.APIResponse) {
-	var wg sync.WaitGroup
-
-	for _, part := range chunk {
-		wg.Add(1)
-		go func(currentPart types.PartData) {
-			defer wg.Done()
-
-			qty, _ := strconv.Atoi(currentPart.Quantity)
-			if qty == 0 {
-				qty = 1 // Default quantity
-			}
-
-			// Используем apiClient из Processor (p.apiClient)
-			p.apiClient.SearchPartAsync(ctx, currentPart.PartNumber, qty, results)
-		}(part)
-	}
-
-	wg.Wait()
 }

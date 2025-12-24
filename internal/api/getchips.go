@@ -76,9 +76,9 @@ func (c *GetchipsClient) SearchPartAsync(ctx context.Context, partNumber string,
 		case <-ctx.Done():
 			return
 		case results <- types.APIResponse{
-			PartNumber: partNumber,
-			Data:       data,
-			Error:      err,
+			PartNumber:   partNumber,
+			GetchipsData: data,
+			GetchipsErr:  err,
 		}:
 		}
 	}()
