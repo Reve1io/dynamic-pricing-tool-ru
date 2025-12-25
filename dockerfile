@@ -11,15 +11,15 @@ RUN go mod tidy
 
 # Собираем бинарник
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o app-ru ./command/server
+    go build -o app ./command/server
 
 # ---------- FINAL STAGE ----------
 FROM alpine:3.18
 
-WORKDIR /app-ru
+WORKDIR /app
 
 # Копируем бинарник
-COPY --from=builder /build/app-ru .
+COPY --from=builder /build/app .
 
 # Запуск
-CMD ["./app-ru"]
+CMD ["./app"]
