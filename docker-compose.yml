@@ -1,0 +1,9 @@
+services:
+  app:
+    image: dynamic-pricing-tool-ru:latest
+    container_name: dynamic-pricing-tool-ru
+    ports:
+      - "5004:5004"
+    restart: unless-stopped
+    env_file:
+      - .env
