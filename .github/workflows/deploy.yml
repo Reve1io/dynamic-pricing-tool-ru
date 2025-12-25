@@ -1,0 +1,47 @@
+name: CI/CD Deploy Dynamic pricing tool russian API
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Deploy to remote server (SSH)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+
+          script: |
+            echo "👉 Переходим в директорию проекта"
+            cd /home/dynamic-pricing-tool-ru
+
+            echo "👉 Сохраняем .env"
+            cp .env /tmp/env_backup_bom
+
+            echo "👉 Обновляем репозиторий из ветки master"
+            git fetch origin master
+            git reset --hard origin/master
+            git clean -fd
+
+            echo "👉 Возвращаем .env"
+            mv /tmp/env_backup_bom .env
+
+            echo "👉 Останавливаем текущие контейнеры"
+            docker compose down
+
+            echo "👉 Строим новый образ (один раз)"
+            docker compose build --no-cache
+
+            echo "👉 Запускаем контейнеры"
+            docker compose up -d
+
+            echo "🎉 Деплой завершён успешно!"
