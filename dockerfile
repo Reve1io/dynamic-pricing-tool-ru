@@ -11,7 +11,7 @@ RUN go mod tidy
 
 # Собираем бинарник
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o app ./cmd/server/app-ru
+    go build -o app-ru ./cmd/server
 
 # ---------- FINAL STAGE ----------
 FROM alpine:3.18
