@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"dynamic-pricing-tool-ru/internal/logger"
 	"dynamic-pricing-tool-ru/internal/types"
 )
 
@@ -23,7 +24,8 @@ func NewGetchipsClient(baseURL, token string) *GetchipsClient {
 		baseURL: baseURL,
 		token:   token,
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Transport: logger.NewLoggingRoundTripper(nil),
+			Timeout:   30 * time.Second,
 		},
 	}
 }

@@ -4,3 +4,6 @@ cmd/server/app.env
 cmd/server/.env
 go.mod
 go.sum
+logs
+/logs
+cmd/server/logs
