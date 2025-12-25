@@ -1,9 +1,11 @@
-app.env
 .env
-cmd/server/app.env
 cmd/server/.env
 go.mod
 go.sum
 logs
 /logs
 cmd/server/logs
+
+!cmd/
+!cmd/server/
+!cmd/server/main.go
