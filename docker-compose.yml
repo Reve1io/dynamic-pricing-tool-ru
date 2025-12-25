@@ -1,5 +1,6 @@
 services:
   app:
+    build: .
     image: dynamic-pricing-tool-ru:latest
     container_name: dynamic-pricing-tool-ru
     ports:
