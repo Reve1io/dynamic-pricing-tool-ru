@@ -1,5 +1,5 @@
 # ---------- BUILD STAGE ----------
-FROM golang:1.22-alpine AS builder
+FROM golang:1.25.5-alpine AS builder
 
 WORKDIR /dynamic-pricing-tool-ru
 
