@@ -11,15 +11,15 @@ RUN go mod tidy
 
 # Собираем бинарник
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o app
+    go build -o app ./cmd/server/app-ru
 
 # ---------- FINAL STAGE ----------
 FROM alpine:3.18
 
-WORKDIR /app
+WORKDIR /app-ru
 
 # Копируем бинарник
-COPY --from=builder /dynamic-pricing-tool-ru/app .
+COPY --from=builder /build/app-ru .
 
 # Запуск
-CMD ["./app"]
+CMD ["./app-ru"]
