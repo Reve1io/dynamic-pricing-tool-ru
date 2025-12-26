@@ -1,25 +1,41 @@
-# ---------- BUILD STAGE ----------
-FROM golang:1.25.5-alpine AS builder
-
-WORKDIR /dynamic-pricing-tool-ru
-
-# Копируем весь проект
-COPY . .
-
-# Приводим модули в порядок
-RUN go mod tidy
-
-# Собираем бинарник
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -o app ./command/server
-
-# ---------- FINAL STAGE ----------
-FROM alpine:3.18
+# Stage 1: Build
+FROM golang:1.25.3-alpine AS builder
 
 WORKDIR /app
 
-# Копируем бинарник
-COPY --from=builder /build/app .
+# Устанавливаем минимальные зависимости
+RUN apk add --no-cache git ca-certificates tzdata
 
-# Запуск
-CMD ["./app"]
+# Копируем модули для кэширования
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Копируем все исходники
+COPY . .
+
+# Собираем приложение из cmd/server/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/pricing-tool ./cmd/server/
+
+# Stage 2: Runtime
+FROM alpine:3.19
+
+RUN apk --no-cache add ca-certificates tzdata curl
+
+WORKDIR /app
+
+# Копируем бинарник из builder
+COPY --from=builder /app/pricing-tool .
+COPY --from=builder /app/cmd/server/.env.example .env.example
+
+# Создаем директории для логов
+RUN mkdir -p /app/logs
+
+# Создаем непривилегированного пользователя
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Экспортируем порт приложения
+EXPOSE 5004
+
+# Запускаем приложение
+CMD ["./pricing-tool"]
