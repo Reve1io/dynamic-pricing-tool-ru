@@ -1,17 +1,9 @@
 services:
-  dynamic-pricing-tool:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: dynamic-pricing-tool-ru
+  pricing-tool-ru:
+    container_name: pricing-tool-ru
+    build: .
     restart: always
     ports:
       - "5004:5004"
-    volumes:
-      - ./logs:/dynamic-pricing-tool-ru/logs
-    networks:
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+    env_file:
+      - cmd/server/.env

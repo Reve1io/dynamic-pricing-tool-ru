@@ -1,41 +1,32 @@
-# Stage 1: Build
+# ---------- build stage ----------
 FROM golang:1.25.3-alpine AS builder
 
 WORKDIR /app
 
-# Устанавливаем минимальные зависимости
-RUN apk add --no-cache git ca-certificates tzdata
-
-# Копируем модули для кэширования
+# зависимости
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Копируем все исходники
+# исходники
 COPY . .
 
-# Собираем приложение из cmd/server/main.go
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/pricing-tool ./cmd/server/
+# сборка бинарника
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -o pricing-tool-ru cmd/server/main.go
 
-# Stage 2: Runtime
-FROM alpine:3.19
 
-RUN apk --no-cache add ca-certificates tzdata curl
+# ---------- runtime stage ----------
+FROM alpine:latest
 
 WORKDIR /app
 
-# Копируем бинарник из builder
-COPY --from=builder /app/pricing-tool .
-COPY --from=builder /app/cmd/server/.env.example .env.example
+# сертификаты (на всякий случай)
+RUN apk add --no-cache ca-certificates
 
-# Создаем директории для логов
-RUN mkdir -p /app/logs
+# бинарник
+COPY --from=builder /app/pricing-tool-ru .
 
-# Создаем непривилегированного пользователя
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
-
-# Экспортируем порт приложения
+# .env будет монтироваться через docker-compose
 EXPOSE 5004
 
-# Запускаем приложение
-CMD ["./pricing-tool"]
+CMD ["./pricing-tool-ru"]
