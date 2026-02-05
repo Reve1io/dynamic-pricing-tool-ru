@@ -42,7 +42,6 @@ func FormatGetchipsData(raw *types.GetchipsResponse, partNumber string) *types.S
 		priceBreaks = append(priceBreaks, types.PriceBreak{
 			Quantity: pb.Quantity,
 			Price:    pb.Price,
-			Total:    pb.Summ,
 		})
 	}
 

@@ -2,8 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -11,6 +11,9 @@ import (
 
 	"dynamic-pricing-tool-ru/internal/logger"
 	"dynamic-pricing-tool-ru/internal/types"
+
+	"github.com/yosuke-furukawa/json5/encoding/json5"
+	"go.uber.org/zap"
 )
 
 type GetchipsClient struct {
@@ -47,10 +50,11 @@ func (c *GetchipsClient) SearchPart(ctx context.Context, partNumber string, quan
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "PartAPIProcessor/1.0")
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("Accept", "application/json, text/plain, */*")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Referer", "https://getchips.com/")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -62,8 +66,17 @@ func (c *GetchipsClient) SearchPart(ctx context.Context, partNumber string, quan
 		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
 	}
 
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body error: %w", err)
+	}
+
 	var result types.GetchipsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json5.Unmarshal(respBytes, &result); err != nil {
+		logger.L.Error("DECODE ERROR",
+			zap.ByteString("raw", respBytes),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 

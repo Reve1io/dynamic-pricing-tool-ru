@@ -14,31 +14,23 @@ type PartData struct {
 
 type GetchipsResponse struct {
 	Data []struct {
-		Title        string  `json:"title"`
-		Quantity     int     `json:"quantity"`
-		SPrice       float64 `json:"sPrice"`
-		DonorID      *string `json:"donorID"`
-		Donor        string  `json:"donor"`
-		Folddivision int     `json:"folddivision"`
-		Minq         int     `json:"minq"`
-		Brand        string  `json:"brand"`
-		Orderdays    int     `json:"orderdays"`
-		Price        float64 `json:"price"`
-		EQuantity    int     `json:"eQuantity"`
-		SearchWord   string  `json:"search_word"`
-		Currency     int     `json:"currency"`
-		Match        int     `json:"match"`
-		PriceBreak   []struct {
-			Quantity int     `json:"quantity"`
-			Price    float64 `json:"price"`
-			Summ     float64 `json:"summ"`
-		} `json:"priceBreak"`
-		QuantityPrice float64 `json:"quantityPrice"`
-		Packaging     string  `json:"packaging"`
-		Manufacturer  string  `json:"manufacturer"`
-		Description   string  `json:"description"`
-		SPriceRub     float64 `json:"sPriceRub"`
-		PriceRub      float64 `json:"priceRub"`
+		Title         string       `json:"title"`
+		Quantity      int          `json:"quantity"`
+		SPack         int          `json:"sPack"`
+		DonorID       interface{}  `json:"donorID"`
+		Donor         string       `json:"donor"`
+		Folddivision  int          `json:"folddivision"`
+		Minq          int          `json:"minq"`
+		Brand         string       `json:"brand"`
+		Orderdays     int          `json:"orderdays"`
+		Price         float64      `json:"price"`
+		EQuantity     int          `json:"eQuantity"`
+		SearchWord    string       `json:"search_word"`
+		Currency      int          `json:"currency"`
+		Match         int          `json:"match"`
+		PriceBreak    []PriceBreak `json:"priceBreak"`
+		QuantityPrice float64      `json:"quantityPrice"`
+		Packaging     string       `json:"packaging"`
 	} `json:"data"`
 }
 
@@ -46,27 +38,17 @@ type EfindResponse []struct {
 	Filial interface{} `json:"filial"`
 	Finish float64     `json:"finish"`
 	Rows   []struct {
-		Cr      []interface{}   `json:"cr"`
-		Cur     string          `json:"cur"`
-		Dc      string          `json:"dc"`
-		Dlv     string          `json:"dlv"`
-		Img     string          `json:"img"`
-		Instock bool            `json:"instock"`
-		Mfg     string          `json:"mfg"`
-		Moq     string          `json:"moq"`
-		Mpq     string          `json:"mpq"`
-		Note    string          `json:"note"`
-		Od      int             `json:"od"`
-		Pack    string          `json:"pack"`
 		Part    string          `json:"part"`
-		Pdf     string          `json:"pdf"`
-		Pkg     string          `json:"pkg"`
+		Cur     string          `json:"cur"`
+		Instock bool            `json:"instock"`
 		Price   [][]interface{} `json:"price"`
-		Sku     string          `json:"sku"`
-		Stock   string          `json:"stock"`
-		Um      string          `json:"um"`
-		Url     string          `json:"url"`
+
+		Moq   interface{} `json:"moq"`
+		Mpq   interface{} `json:"mpq"`
+		Stock interface{} `json:"stock"`
+		Od    interface{} `json:"od"`
 	} `json:"rows"`
+
 	StockID   int `json:"stock_id"`
 	StockData struct {
 		City          string   `json:"city"`
