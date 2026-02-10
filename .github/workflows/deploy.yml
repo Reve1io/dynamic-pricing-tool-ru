@@ -1,47 +1,44 @@
-name: CI/CD Deploy Dynamic pricing tool russian API
+name: CI/CD for dynamic-pricing-tool-ru
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Deploy to remote server (SSH)
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "👉 Переходим в директорию проекта"
-            cd /home/dynamic-pricing-tool-ru
+            set -e
 
-            echo "👉 Сохраняем .env"
-            cp .env /tmp/env_backup_bom
+            echo "👉 Go to project"
+            cd /home/romab/dynamic-pricing-tool-ru
 
-            echo "👉 Обновляем репозиторий из ветки master"
+            echo "👉 Hard reset repo"
             git fetch origin master
             git reset --hard origin/master
             git clean -fd
 
-            echo "👉 Возвращаем .env"
-            mv /tmp/env_backup_bom .env
+            echo "👉 Init/Update Go modules"
+            go mod tidy
+            go mod download
 
-            echo "👉 Останавливаем текущие контейнеры"
-            docker compose down
+            echo "👉 Build fresh binary"
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -o app cmd/server/main.go
 
-            echo "👉 Строим новый образ (один раз)"
-            docker compose build --no-cache
+            echo "👉 Deploy binary"
+            cp app /opt/dynamic-pricing-tool-ru/app
+            chmod +x /opt/dynamic-pricing-tool-ru/app
 
-            echo "👉 Запускаем контейнеры"
-            docker compose up -d
+            echo "👉 Restart service"
+            sudo systemctl restart dynamic-pricing-tool-ru
 
-            echo "🎉 Деплой завершён успешно!"
+            echo "✅ Deploy done"
