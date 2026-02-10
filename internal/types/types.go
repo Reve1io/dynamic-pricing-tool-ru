@@ -159,6 +159,10 @@ type PromelecItem struct {
 	ItemID       int    `json:"item_id"`
 	Name         string `json:"name"`
 	ProducerName string `json:"producer_name"`
+	CategoryID   int    `json:"class2_id"`
+	CategoryName string `json:"class2name"`
+	Description  string `json:"description"`
+	PhotoURL     string `json:"photo_url"`
 	Package      string `json:"package"`
 	Quant        int    `json:"quant"`
 	Moq          int    `json:"moq"`
@@ -176,4 +180,38 @@ type SimplifiedPromelecData struct {
 	Stock        int
 	MOQ          int
 	Prices       []PriceBreak
+}
+
+type UnifiedPriceBreak struct {
+	Quantity              int     `json:"quantity"`
+	Price                 float64 `json:"price"`
+	CostWithDelivery      float64 `json:"cost_with_delivery"`
+	TargetPricePurchasing float64 `json:"target_price_purchasing"`
+	TargetPriceSales      float64 `json:"target_price_sales"`
+	Currency              string  `json:"currency"`
+}
+
+type UnifiedOffer struct {
+	CategoryID   int    `json:"category_id,omitempty"`
+	CategoryName string `json:"category_name,omitempty"`
+	MPN          string `json:"mpn"`
+	RequestedMPN string `json:"requested_mpn"`
+	RequestedQty int    `json:"requested_quantity"`
+
+	Manufacturer string `json:"manufacturer"`
+	Description  string `json:"description,omitempty"`
+	ImageURL     string `json:"image_url,omitempty"`
+
+	SellerName     string `json:"seller_name"`
+	SellerHomepage string `json:"seller_homepageUrl,omitempty"`
+	SellerVerified bool   `json:"seller_verified"`
+
+	Stock  int    `json:"stock"`
+	Status string `json:"status"`
+
+	Price       float64             `json:"price"`
+	Currency    string              `json:"currency"`
+	PriceBreaks []UnifiedPriceBreak `json:"priceBreaks"`
+
+	Source string `json:"source"`
 }

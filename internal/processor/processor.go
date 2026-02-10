@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"dynamic-pricing-tool-ru/internal/api"
 	"dynamic-pricing-tool-ru/internal/types"
@@ -27,21 +26,17 @@ func NewProcessorWithClients(getchipsClient *api.GetchipsClient, efindClient *ap
 	}
 }
 
-func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]types.CombinedResult, error) {
+func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]types.UnifiedOffer, error) {
 	parts, err := p.extractPartData(req)
 	if err != nil {
 		return nil, err
-	}
-
-	if len(parts) == 0 {
-		return []types.CombinedResult{}, nil
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	jobs := make(chan types.PartData, len(parts))
-	resultsChan := make(chan types.CombinedResult, len(parts))
+	resultsChan := make(chan types.UnifiedOffer, len(parts))
 
 	var wg sync.WaitGroup
 
@@ -66,15 +61,15 @@ func (p *Processor) ProcessRequest(ctx context.Context, req *types.Request) ([]t
 		close(resultsChan)
 	}()
 
-	var allResults []types.CombinedResult
-	for result := range resultsChan {
-		allResults = append(allResults, result)
+	var allOffers []types.UnifiedOffer
+	for o := range resultsChan {
+		allOffers = append(allOffers, o)
 	}
 
-	return allResults, nil
+	return allOffers, nil
 }
 
-func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, results chan<- types.CombinedResult, wg *sync.WaitGroup) {
+func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, results chan<- types.UnifiedOffer, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for part := range jobs {
@@ -86,39 +81,14 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 
 			apiResult := p.combinedClient.SearchAllAPIs(ctx, part.PartNumber, qty)
 
-			simplifiedGetchips := FormatGetchipsData(apiResult.GetchipsData, part.PartNumber)
-			simplifiedEfind := FormatEfindData(apiResult.EfindData)
-			promelecFormatted := FormatPromelecData(apiResult.PromelecData)
+			offers := []types.UnifiedOffer{}
 
-			combinedResult := types.CombinedResult{
-				PartNumber:   part.PartNumber,
-				RequestedQty: qty,
-				RowIndex:     part.RowIndex,
-				Getchips:     simplifiedGetchips,
-				Efind:        simplifiedEfind,
-				Promelec:     promelecFormatted,
-				GetchipsRaw:  apiResult.GetchipsData,
-				EfindRaw:     apiResult.EfindData,
-				Timestamp:    time.Now().Format(time.RFC3339),
-			}
+			offers = append(offers, FormatGetchipsData(apiResult.GetchipsData, part.PartNumber, qty)...)
+			offers = append(offers, FormatEfindData(apiResult.EfindData, part.PartNumber, qty)...)
+			offers = append(offers, FormatPromelecData(apiResult.PromelecData, part.PartNumber, qty)...)
 
-			if apiResult.GetchipsErr != nil {
-				combinedResult.GetchipsError = apiResult.GetchipsErr.Error()
-			}
-
-			if apiResult.EfindErr != nil {
-				combinedResult.EfindError = apiResult.EfindErr.Error()
-			}
-
-			if apiResult.PromelecErr != nil {
-				combinedResult.PromelecError = apiResult.PromelecErr.Error()
-			}
-
-			// Отправляем результат
-			select {
-			case <-ctx.Done():
-				return
-			case results <- combinedResult:
+			for _, o := range offers {
+				results <- o
 			}
 		}
 	}

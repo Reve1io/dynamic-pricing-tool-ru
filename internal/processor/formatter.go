@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"dynamic-pricing-tool-ru/internal/types"
+	"dynamic-pricing-tool-ru/internal/utils"
 )
 
 func toInt(v interface{}) int {
@@ -20,118 +21,166 @@ func toInt(v interface{}) int {
 	}
 }
 
-// FormatGetchipsData преобразует сырые данные Getchips в упрощенный формат
-func FormatGetchipsData(raw *types.GetchipsResponse, partNumber string) *types.SimplifiedGetchipsData {
-	if raw == nil || len(raw.Data) == 0 {
+func FormatGetchipsData(raw *types.GetchipsResponse, requestedMPN string, requestedQty int) []types.UnifiedOffer {
+	if raw == nil {
 		return nil
 	}
 
-	data := raw.Data[0]
+	var offers []types.UnifiedOffer
 
-	// Определяем валюту
-	currency := "USD"
-	if data.Currency == 1 {
-		currency = "USD"
-	} else if data.Currency == 2 {
-		currency = "EUR"
-	}
+	for _, d := range raw.Data {
+		currency := "USD"
 
-	// Преобразуем PriceBreak
-	priceBreaks := make([]types.PriceBreak, 0, len(data.PriceBreak))
-	for _, pb := range data.PriceBreak {
-		priceBreaks = append(priceBreaks, types.PriceBreak{
-			Quantity: pb.Quantity,
-			Price:    pb.Price,
+		pb := make([]types.PriceBreak, 0, len(d.PriceBreak))
+		for _, p := range d.PriceBreak {
+			pb = append(pb, types.PriceBreak{
+				Quantity: p.Quantity,
+				Price:    p.Price,
+			})
+		}
+
+		priceBreaks := buildPriceBreaks(pb, currency)
+
+		basePrice := 0.0
+		if len(pb) > 0 {
+			basePrice = pb[0].Price
+		}
+
+		offers = append(offers, types.UnifiedOffer{
+			MPN:          d.Title,
+			RequestedMPN: requestedMPN,
+			RequestedQty: requestedQty,
+
+			Manufacturer:   d.Brand,
+			SellerName:     d.Brand,
+			SellerVerified: true,
+
+			Stock:    d.Quantity,
+			Status:   "Найдено",
+			Price:    basePrice,
+			Currency: currency,
+
+			PriceBreaks: priceBreaks,
+			Source:      "getchips",
 		})
 	}
 
-	return &types.SimplifiedGetchipsData{
-		PartNumber:   data.Title,
-		AvailableQty: data.Quantity,
-		Brand:        data.Brand,
-		Supplier:     data.Donor,
-		Price:        data.Price,
-		Currency:     currency,
-		LeadTimeDays: data.Orderdays,
-		PriceBreaks:  priceBreaks,
-		Packaging:    data.Packaging,
-		MinOrderQty:  data.Minq,
-	}
+	return offers
 }
 
-// FormatEfindData преобразует сырые данные Efind в упрощенный формат
-func FormatEfindData(raw *types.EfindResponse) *types.SimplifiedEfindData {
+func FormatEfindData(raw *types.EfindResponse, requestedMPN string, requestedQty int) []types.UnifiedOffer {
 	if raw == nil || len(*raw) == 0 {
 		return nil
 	}
 
-	// Берем первый результат
-	result := (*raw)[0]
+	var offers []types.UnifiedOffer
 
-	if len(result.Rows) == 0 {
-		return nil
-	}
+	for _, stock := range *raw {
+		for _, row := range stock.Rows {
 
-	row := result.Rows[0]
+			availableQty := toInt(row.Stock)
 
-	// Парсим количество
-	availableQty := toInt(row.Stock)
-	if availableQty < 0 {
-		availableQty = 0
-	}
+			// Собираем pricebreaks
+			var pbs []types.PriceBreak
+			for _, p := range row.Price {
+				if len(p) < 3 {
+					continue
+				}
 
-	inStock := availableQty > 0
+				qty := toInt(p[0])
+				price, ok := p[2].(float64)
+				if !ok {
+					continue
+				}
 
-	// Парсим минимальное количество заказа
-	minOrderQty := toInt(row.Moq)
-
-	// Извлекаем цену (первая цена из массива)
-	var price float64
-	if len(row.Price) > 0 && len(row.Price[0]) > 2 {
-		if priceVal, ok := row.Price[0][2].(float64); ok {
-			price = priceVal
-		}
-	}
-
-	// Преобразуем прайс-брейки
-	priceBreaks := make([]types.PriceBreak, 0, len(row.Price))
-	for _, p := range row.Price {
-		if len(p) >= 3 {
-			qty := toInt(p[0])
-
-			price, ok := p[2].(float64)
-			if !ok {
-				continue
+				pbs = append(pbs, types.PriceBreak{
+					Quantity: qty,
+					Price:    price,
+				})
 			}
 
-			priceBreaks = append(priceBreaks, types.PriceBreak{
-				Quantity: qty,
-				Price:    price,
+			priceBreaks := buildPriceBreaks(pbs, row.Cur)
+
+			basePrice := 0.0
+			if len(pbs) > 0 {
+				basePrice = pbs[0].Price
+			}
+
+			offers = append(offers, types.UnifiedOffer{
+				MPN:          row.Part,
+				RequestedMPN: requestedMPN,
+				RequestedQty: requestedQty,
+
+				Manufacturer: "", // у efind нет бренда
+				Description:  "",
+				ImageURL:     "",
+
+				SellerName:     stock.StockData.Title,
+				SellerHomepage: stock.StockData.Site,
+				SellerVerified: true,
+
+				Stock:    availableQty,
+				Status:   "Найдено",
+				Price:    basePrice,
+				Currency: row.Cur,
+
+				PriceBreaks: priceBreaks,
+				Source:      "efind",
 			})
 		}
 	}
 
-	supplierInfo := types.SupplierInfo{
-		Name:     result.StockData.Title,
-		City:     result.StockData.City,
-		Country:  result.StockData.Country,
-		Email:    result.StockData.ContactEmail,
-		Phones:   result.StockData.ContactPhones,
-		Website:  result.StockData.Site,
-		MinOrder: result.StockData.MinOrder,
+	return offers
+}
+
+func FormatPromelecData(data types.PromelecResponse, requestedMPN string, requestedQty int) []types.UnifiedOffer {
+	var offers []types.UnifiedOffer
+
+	for _, item := range data {
+
+		// pricebreaks
+		var pbs []types.PriceBreak
+		for _, pb := range item.Pricebreaks {
+			pbs = append(pbs, types.PriceBreak{
+				Quantity: pb.Quant,
+				Price:    pb.Price,
+			})
+		}
+
+		priceBreaks := buildPriceBreaks(pbs, "RUB")
+
+		basePrice := 0.0
+		if len(pbs) > 0 {
+			basePrice = pbs[0].Price
+		}
+
+		offers = append(offers, types.UnifiedOffer{
+			CategoryID:   item.CategoryID,
+			CategoryName: item.CategoryName,
+
+			MPN:          item.Name,
+			RequestedMPN: requestedMPN,
+			RequestedQty: requestedQty,
+
+			Manufacturer: item.ProducerName,
+			Description:  item.Description,
+			ImageURL:     item.PhotoURL,
+
+			SellerName:     "Promelec",
+			SellerHomepage: "https://promelec.ru",
+			SellerVerified: true,
+
+			Stock:    item.Quant,
+			Status:   "Найдено",
+			Price:    basePrice,
+			Currency: "RUB",
+
+			PriceBreaks: priceBreaks,
+			Source:      "promelec",
+		})
 	}
 
-	return &types.SimplifiedEfindData{
-		PartNumber:   row.Part,
-		Supplier:     result.StockData.Title,
-		AvailableQty: availableQty,
-		Price:        price,
-		Currency:     row.Cur,
-		PriceBreaks:  priceBreaks,
-		SupplierInfo: supplierInfo,
-		InStock:      inStock,
-		MinOrderQty:  minOrderQty,
-	}
+	return offers
 }
 
 // CompareAndSelectBest сравнивает результаты от двух API и выбирает лучший
@@ -162,26 +211,28 @@ func CompareAndSelectBest(getchips *types.SimplifiedGetchipsData, efind *types.S
 	return getchips, efind, "both_valid"
 }
 
-func FormatPromelecData(data types.PromelecResponse) []types.SimplifiedPromelecData {
-	var result []types.SimplifiedPromelecData
+const (
+	deliveryCoef = 1.27
+	markup       = 1.18
+)
 
-	for _, item := range data {
-		s := types.SimplifiedPromelecData{
-			PartNumber:   item.Name,
-			Manufacturer: item.ProducerName,
-			Package:      item.Package,
-			Stock:        item.Quant,
-			MOQ:          item.Moq,
-		}
+func buildPriceBreaks(priceBreaks []types.PriceBreak, currency string) []types.UnifiedPriceBreak {
+	var result []types.UnifiedPriceBreak
 
-		for _, pb := range item.Pricebreaks {
-			s.Prices = append(s.Prices, types.PriceBreak{
-				Quantity: pb.Quant,
-				Price:    pb.Price,
-			})
-		}
+	for _, pb := range priceBreaks {
+		base := pb.Price
+		targetPurch := base * 0.82
+		costDelivery := targetPurch + deliveryCoef
+		targetSales := costDelivery + markup
 
-		result = append(result, s)
+		result = append(result, types.UnifiedPriceBreak{
+			Quantity:              pb.Quantity,
+			Price:                 utils.Round(base, 2),
+			Currency:              currency,
+			CostWithDelivery:      utils.Round(costDelivery, 2),
+			TargetPricePurchasing: utils.Round(targetPurch, 2),
+			TargetPriceSales:      utils.Round(targetSales, 2),
+		})
 	}
 
 	return result
