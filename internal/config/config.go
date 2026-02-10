@@ -11,6 +11,9 @@ type Config struct {
 	GetchipsToken  string
 	EfindURL       string
 	EfindToken     string
+	PromelecURL    string
+	PromelecLogin  string
+	PromelecPass   string
 	RedisAddr      string
 	RabbitMQURL    string
 	ChunkSize      int
@@ -24,6 +27,9 @@ func LoadConfig() Config {
 		GetchipsToken:  getEnv("GETCHIPS_TOKEN", ""),
 		EfindURL:       getEnv("EFIND_URL", "https://efind.ru/api/search"),
 		EfindToken:     getEnv("EFIND_TOKEN", ""),
+		PromelecURL:    getEnv("PROMELEC_URL", "https://aaa.na4u.ru/rpc"),
+		PromelecLogin:  getEnv("PROMELEC_LOGIN", ""),
+		PromelecPass:   getEnv("PROMELEC_PASS", ""),
 		RedisAddr:      getEnv("REDIS_ADDR", ""),
 		RabbitMQURL:    getEnv("RABBITMQ_URL", ""),
 		ChunkSize:      getEnvAsInt("CHUNK_SIZE", 50),

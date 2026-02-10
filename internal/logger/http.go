@@ -62,18 +62,21 @@ func (l *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, erro
 		return nil, err
 	}
 
-	// --- Response body ---
+	// --- Response body (КЛЮЧЕВОЕ МЕСТО) ---
 	var respBody []byte
 	if resp.Body != nil {
-		respBody, _ = io.ReadAll(resp.Body)
+		respBody, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return resp, err
+		}
 
-		// 🔥 ВОТ ЭТО ТЫ ХОТЕЛ
 		L.Info("RAW API RESPONSE",
 			zap.String("url", req.URL.String()),
 			zap.ByteString("raw_body", limitSize(respBody)),
 		)
 
-		// возвращаем body обратно, иначе дальше его никто не сможет читать
+		// ВОЗВРАЩАЕМ body обратно
+		resp.Body.Close()
 		resp.Body = io.NopCloser(bytes.NewBuffer(respBody))
 	}
 

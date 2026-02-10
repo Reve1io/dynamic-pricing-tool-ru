@@ -161,3 +161,28 @@ func CompareAndSelectBest(getchips *types.SimplifiedGetchipsData, efind *types.S
 	// По умолчанию возвращаем оба
 	return getchips, efind, "both_valid"
 }
+
+func FormatPromelecData(data types.PromelecResponse) []types.SimplifiedPromelecData {
+	var result []types.SimplifiedPromelecData
+
+	for _, item := range data {
+		s := types.SimplifiedPromelecData{
+			PartNumber:   item.Name,
+			Manufacturer: item.ProducerName,
+			Package:      item.Package,
+			Stock:        item.Quant,
+			MOQ:          item.Moq,
+		}
+
+		for _, pb := range item.Pricebreaks {
+			s.Prices = append(s.Prices, types.PriceBreak{
+				Quantity: pb.Quant,
+				Price:    pb.Price,
+			})
+		}
+
+		result = append(result, s)
+	}
+
+	return result
+}

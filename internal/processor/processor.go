@@ -18,8 +18,8 @@ type Processor struct {
 	workerPoolSize int
 }
 
-func NewProcessorWithClients(getchipsClient *api.GetchipsClient, efindClient *api.EfindClient, chunkSize int) *Processor {
-	combinedClient := api.NewCombinedAPIClient(getchipsClient, efindClient)
+func NewProcessorWithClients(getchipsClient *api.GetchipsClient, efindClient *api.EfindClient, promelec *api.PromelecClient, chunkSize int) *Processor {
+	combinedClient := api.NewCombinedAPIClient(getchipsClient, efindClient, promelec)
 	return &Processor{
 		combinedClient: combinedClient,
 		chunkSize:      chunkSize,
@@ -88,6 +88,7 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 
 			simplifiedGetchips := FormatGetchipsData(apiResult.GetchipsData, part.PartNumber)
 			simplifiedEfind := FormatEfindData(apiResult.EfindData)
+			promelecFormatted := FormatPromelecData(apiResult.PromelecData)
 
 			combinedResult := types.CombinedResult{
 				PartNumber:   part.PartNumber,
@@ -95,6 +96,7 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 				RowIndex:     part.RowIndex,
 				Getchips:     simplifiedGetchips,
 				Efind:        simplifiedEfind,
+				Promelec:     promelecFormatted,
 				GetchipsRaw:  apiResult.GetchipsData,
 				EfindRaw:     apiResult.EfindData,
 				Timestamp:    time.Now().Format(time.RFC3339),
@@ -106,6 +108,10 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 
 			if apiResult.EfindErr != nil {
 				combinedResult.EfindError = apiResult.EfindErr.Error()
+			}
+
+			if apiResult.PromelecErr != nil {
+				combinedResult.PromelecError = apiResult.PromelecErr.Error()
 			}
 
 			// Отправляем результат

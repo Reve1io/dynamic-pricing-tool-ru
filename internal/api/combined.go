@@ -10,12 +10,14 @@ import (
 type CombinedAPIClient struct {
 	getchips *GetchipsClient
 	efind    *EfindClient
+	promelec *PromelecClient
 }
 
-func NewCombinedAPIClient(getchips *GetchipsClient, efind *EfindClient) *CombinedAPIClient {
+func NewCombinedAPIClient(getchips *GetchipsClient, efind *EfindClient, promelec *PromelecClient) *CombinedAPIClient {
 	return &CombinedAPIClient{
 		getchips: getchips,
 		efind:    efind,
+		promelec: promelec,
 	}
 }
 
@@ -30,7 +32,7 @@ func (c *CombinedAPIClient) SearchAllAPIs(ctx context.Context, partNumber string
 	result.PartNumber = partNumber
 	result.RequestedQty = quantity
 
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		defer wg.Done()
@@ -44,6 +46,13 @@ func (c *CombinedAPIClient) SearchAllAPIs(ctx context.Context, partNumber string
 		data, err := c.efind.SearchPart(ctx, partNumber, quantity)
 		result.EfindData = data
 		result.EfindErr = err
+	}()
+
+	go func() {
+		defer wg.Done()
+		data, err := c.promelec.SearchPart(ctx, partNumber)
+		result.PromelecData = data
+		result.PromelecErr = err
 	}()
 
 	wg.Wait()

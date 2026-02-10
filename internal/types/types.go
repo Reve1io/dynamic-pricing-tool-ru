@@ -106,16 +106,18 @@ type SupplierInfo struct {
 }
 
 type CombinedResult struct {
-	PartNumber    string                  `json:"partNumber"`
-	RequestedQty  int                     `json:"requestedQty"`
-	RowIndex      int                     `json:"rowIndex"`
-	Getchips      *SimplifiedGetchipsData `json:"getchips,omitempty"`
-	Efind         *SimplifiedEfindData    `json:"efind,omitempty"`
-	GetchipsRaw   *GetchipsResponse       `json:"getchipsRaw,omitempty"`
-	EfindRaw      *EfindResponse          `json:"efindRaw,omitempty"`
-	GetchipsError string                  `json:"getchipsError,omitempty"`
-	EfindError    string                  `json:"efindError,omitempty"`
-	Timestamp     string                  `json:"timestamp"`
+	PartNumber    string                   `json:"partNumber"`
+	RequestedQty  int                      `json:"requestedQty"`
+	RowIndex      int                      `json:"rowIndex"`
+	Getchips      *SimplifiedGetchipsData  `json:"getchips,omitempty"`
+	Efind         *SimplifiedEfindData     `json:"efind,omitempty"`
+	Promelec      []SimplifiedPromelecData `json:"promelec,omitempty"`
+	GetchipsRaw   *GetchipsResponse        `json:"getchipsRaw,omitempty"`
+	EfindRaw      *EfindResponse           `json:"efindRaw,omitempty"`
+	GetchipsError string                   `json:"getchipsError,omitempty"`
+	EfindError    string                   `json:"efindError,omitempty"`
+	PromelecError string                   `json:"promelecError,omitempty"`
+	Timestamp     string                   `json:"timestamp"`
 }
 
 type APIResponse struct {
@@ -124,8 +126,10 @@ type APIResponse struct {
 	RequestedQty int
 	GetchipsData *GetchipsResponse
 	EfindData    *EfindResponse
+	PromelecData PromelecResponse
 	GetchipsErr  error
 	EfindErr     error
+	PromelecErr  error
 	RowIndex     int
 }
 
@@ -145,4 +149,31 @@ type PriceComparison struct {
 	EfindPrice        float64 `json:"efindPrice"`
 	BetterPrice       string  `json:"betterPrice"`
 	DifferencePercent float64 `json:"differencePercent"`
+}
+
+// ================= PROMELEC =================
+
+type PromelecResponse []PromelecItem
+
+type PromelecItem struct {
+	ItemID       int    `json:"item_id"`
+	Name         string `json:"name"`
+	ProducerName string `json:"producer_name"`
+	Package      string `json:"package"`
+	Quant        int    `json:"quant"`
+	Moq          int    `json:"moq"`
+	Munit        string `json:"munit"`
+	Pricebreaks  []struct {
+		Quant int     `json:"quant"`
+		Price float64 `json:"price"`
+	} `json:"pricebreaks"`
+}
+
+type SimplifiedPromelecData struct {
+	PartNumber   string
+	Manufacturer string
+	Package      string
+	Stock        int
+	MOQ          int
+	Prices       []PriceBreak
 }

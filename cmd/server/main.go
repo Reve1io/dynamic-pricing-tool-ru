@@ -34,8 +34,9 @@ func main() {
 
 	getchipsClient := api.NewGetchipsClient(cfg.GetchipsURL, cfg.GetchipsToken)
 	efindClient := api.NewEfindClient(cfg.EfindURL, cfg.EfindToken)
+	promelecClient := api.NewPromelecClient(cfg.PromelecURL, cfg.PromelecLogin, cfg.PromelecPass)
 
-	proc := processor.NewProcessorWithClients(getchipsClient, efindClient, cfg.ChunkSize)
+	proc := processor.NewProcessorWithClients(getchipsClient, efindClient, promelecClient, cfg.ChunkSize)
 
 	handler := server.NewHandler(proc)
 

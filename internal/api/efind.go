@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -56,11 +57,10 @@ func (c *EfindClient) SearchPart(ctx context.Context, partNumber string, quantit
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	req.Header.Set("Accept-Language", "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7")
 	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Referer", "https://efind.ru/")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -72,15 +72,18 @@ func (c *EfindClient) SearchPart(ctx context.Context, partNumber string, quantit
 		return nil, fmt.Errorf("API returned status: %d", resp.StatusCode)
 	}
 
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read body error: %w", err)
+	body, _ := io.ReadAll(resp.Body)
+
+	trim := bytes.TrimSpace(body)
+
+	if len(trim) == 0 || trim[0] != '[' {
+		return nil, fmt.Errorf("efind returned non-json response: %s", string(trim[:200]))
 	}
 
 	var result types.EfindResponse
-	if err := json5.Unmarshal(respBytes, &result); err != nil {
+	if err := json5.Unmarshal(trim, &result); err != nil {
 		logger.L.Error("DECODE ERROR",
-			zap.ByteString("raw", respBytes),
+			zap.ByteString("raw", trim),
 
 			zap.Error(err),
 		)
