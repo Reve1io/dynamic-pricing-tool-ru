@@ -6,39 +6,26 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
+      - name: Pull latest code
+        run: |
+          cd /home/romab/dynamic-pricing-tool-ru
+          git fetch origin master
+          git reset --hard origin/master
+          git clean -fd
 
-            echo "👉 Go to project"
-            cd /home/romab/dynamic-pricing-tool-ru
+      - name: Build binary
+        run: |
+          cd /home/romab/dynamic-pricing-tool-ru
+          go mod tidy
+          go build -o app cmd/server/main.go
 
-            echo "👉 Hard reset repo"
-            git fetch origin master
-            git reset --hard origin/master
-            git clean -fd
+      - name: Deploy binary
+        run: |
+          cp /home/romab/dynamic-pricing-tool-ru/app /opt/dynamic-pricing-tool-ru/app
+          chmod +x /opt/dynamic-pricing-tool-ru/app
 
-            echo "👉 Init/Update Go modules"
-            go mod tidy
-            go mod download
-
-            echo "👉 Build fresh binary"
-            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go build -o app cmd/server/main.go
-
-            echo "👉 Deploy binary"
-            cp app /opt/dynamic-pricing-tool-ru/app
-            chmod +x /opt/dynamic-pricing-tool-ru/app
-
-            echo "👉 Restart service"
-            sudo systemctl restart dynamic-pricing-tool-ru
-
-            echo "✅ Deploy done"
+      - name: Restart service
+        run: sudo systemctl restart dynamic-pricing-tool-ru
