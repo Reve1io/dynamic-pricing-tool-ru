@@ -1,4 +1,4 @@
-name: CI/CD for dynamic-pricing-tool-ru
+name: Deploy dynamic-pricing-tool-ru
 
 on:
   push:
@@ -9,23 +9,19 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Pull latest code
-        run: |
-          cd /home/romab/dynamic-pricing-tool-ru
-          git fetch origin master
-          git reset --hard origin/master
-          git clean -fd
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build binary
         run: |
-          cd /home/romab/dynamic-pricing-tool-ru
           go mod tidy
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
           go build -o app cmd/server/main.go
 
       - name: Deploy binary
         run: |
-          cp /home/romab/dynamic-pricing-tool-ru/app /opt/dynamic-pricing-tool-ru/app
-          chmod +x /opt/dynamic-pricing-tool-ru/app
+          sudo cp app /opt/dynamic-pricing-tool-ru/app
+          sudo chmod +x /opt/dynamic-pricing-tool-ru/app
 
       - name: Restart service
         run: sudo systemctl restart dynamic-pricing-tool-ru
