@@ -213,7 +213,7 @@ func CompareAndSelectBest(getchips *types.SimplifiedGetchipsData, efind *types.S
 
 const (
 	deliveryCoef = 1.27
-	markup       = 1.18
+	//markup       = 1.18
 )
 
 func buildPriceBreaks(priceBreaks []types.PriceBreak, currency string) []types.UnifiedPriceBreak {
@@ -221,6 +221,7 @@ func buildPriceBreaks(priceBreaks []types.PriceBreak, currency string) []types.U
 
 	for _, pb := range priceBreaks {
 		base := pb.Price
+		markup := base * 1.10
 		targetPurch := base * 0.82
 		costDelivery := targetPurch + deliveryCoef
 		targetSales := costDelivery + markup
