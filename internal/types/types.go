@@ -90,9 +90,10 @@ type SimplifiedEfindData struct {
 }
 
 type PriceBreak struct {
-	Quantity int     `json:"quantity"`
-	Price    float64 `json:"price"`
-	Total    float64 `json:"total,omitempty"`
+	Quantity     int     `json:"quantity"`
+	Price        float64 `json:"price"`
+	DeliveryTime string  `json:"delivery_time"`
+	Total        float64 `json:"total,omitempty"`
 }
 
 type SupplierInfo struct {
@@ -167,10 +168,20 @@ type PromelecItem struct {
 	Quant        int    `json:"quant"`
 	Moq          int    `json:"moq"`
 	Munit        string `json:"munit"`
+	DeliveryTime string `json:"delivery_time"`
 	Pricebreaks  []struct {
 		Quant int     `json:"quant"`
 		Price float64 `json:"price"`
 	} `json:"pricebreaks"`
+	Vendors []struct {
+		Vendor      int `json:"vendor"`
+		Quant       int `json:"quant`
+		Delivery    int `json:"delivery"`
+		PriceBreaks []struct {
+			Quant int     `json:"quant"`
+			Price float64 `json:"price"`
+		}
+	}
 }
 
 type SimplifiedPromelecData struct {
@@ -209,9 +220,10 @@ type UnifiedOffer struct {
 	Stock  int    `json:"stock"`
 	Status string `json:"status"`
 
-	Price       float64             `json:"price"`
-	Currency    string              `json:"currency"`
-	PriceBreaks []UnifiedPriceBreak `json:"priceBreaks"`
+	Price        float64             `json:"price"`
+	Currency     string              `json:"currency"`
+	DeliveryTime string              `json:"delivery_time"`
+	PriceBreaks  []UnifiedPriceBreak `json:"priceBreaks"`
 
 	Source string `json:"source"`
 }

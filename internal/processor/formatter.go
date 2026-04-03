@@ -1,6 +1,7 @@
 package processor
 
 import (
+	"fmt"
 	"strconv"
 
 	"dynamic-pricing-tool-ru/internal/types"
@@ -31,11 +32,14 @@ func FormatGetchipsData(raw *types.GetchipsResponse, requestedMPN string, reques
 	for _, d := range raw.Data {
 		currency := "USD"
 
+		delivery := formatDeliveryTime(d.Orderdays, "2-3 недели")
+
 		pb := make([]types.PriceBreak, 0, len(d.PriceBreak))
 		for _, p := range d.PriceBreak {
 			pb = append(pb, types.PriceBreak{
-				Quantity: p.Quantity,
-				Price:    p.Price,
+				Quantity:     p.Quantity,
+				Price:        p.Price,
+				DeliveryTime: delivery,
 			})
 		}
 
@@ -55,10 +59,11 @@ func FormatGetchipsData(raw *types.GetchipsResponse, requestedMPN string, reques
 			SellerName:     d.Brand,
 			SellerVerified: true,
 
-			Stock:    d.Quantity,
-			Status:   "Найдено",
-			Price:    basePrice,
-			Currency: currency,
+			Stock:        d.Quantity,
+			Status:       "Найдено",
+			Price:        basePrice,
+			Currency:     currency,
+			DeliveryTime: delivery,
 
 			PriceBreaks: priceBreaks,
 			Source:      "getchips",
@@ -138,46 +143,72 @@ func FormatPromelecData(data types.PromelecResponse, requestedMPN string, reques
 
 	for _, item := range data {
 
-		// pricebreaks
-		var pbs []types.PriceBreak
-		for _, pb := range item.Pricebreaks {
-			pbs = append(pbs, types.PriceBreak{
-				Quantity: pb.Quant,
-				Price:    pb.Price,
+		// если vendors нет → создаем 1 оффер с дефолтом
+		if len(item.Vendors) == 0 {
+
+			delivery := "1-2 недели"
+
+			var priceBreaks []types.PriceBreak
+			for _, pb := range item.Pricebreaks {
+				priceBreaks = append(priceBreaks, types.PriceBreak{
+					Quantity:     pb.Quant,
+					Price:        pb.Price,
+					DeliveryTime: delivery,
+				})
+			}
+
+			basePrice := 0.0
+			if len(priceBreaks) > 0 {
+				basePrice = priceBreaks[0].Price
+			}
+
+			offers = append(offers, types.UnifiedOffer{
+				MPN:          item.Name,
+				RequestedMPN: requestedMPN,
+				RequestedQty: requestedQty,
+				Manufacturer: item.ProducerName,
+				SellerName:   "Promelec",
+				Stock:        item.Quant,
+				Status:       "Найдено",
+				Price:        basePrice,
+				Currency:     "RUB",
+				PriceBreaks:  buildPriceBreaks(priceBreaks, "RUB"),
+				DeliveryTime: delivery,
+				Source:       "promelec",
+			})
+
+			continue
+		}
+
+		// vendors есть → делаем несколько офферов
+		for _, v := range item.Vendors {
+
+			delivery := formatDeliveryTime(v.Delivery, "1-2 недели")
+
+			var priceBreaks []types.PriceBreak
+			for _, pb := range v.PriceBreaks {
+				priceBreaks = append(priceBreaks, types.PriceBreak{
+					Quantity:     pb.Quant,
+					Price:        pb.Price,
+					DeliveryTime: delivery,
+				})
+			}
+
+			offers = append(offers, types.UnifiedOffer{
+				MPN:          item.Name,
+				RequestedMPN: requestedMPN,
+				RequestedQty: requestedQty,
+				Manufacturer: item.ProducerName,
+				SellerName:   "Promelec",
+				Stock:        v.Quant,
+				Status:       "Найдено",
+				Price:        v.PriceBreaks[0].Price,
+				Currency:     "RUB",
+				PriceBreaks:  buildPriceBreaks(priceBreaks, "RUB"),
+				DeliveryTime: "1-2 недели", // верхний уровень всегда default
+				Source:       "promelec",
 			})
 		}
-
-		priceBreaks := buildPriceBreaks(pbs, "RUB")
-
-		basePrice := 0.0
-		if len(pbs) > 0 {
-			basePrice = pbs[0].Price
-		}
-
-		offers = append(offers, types.UnifiedOffer{
-			CategoryID:   item.CategoryID,
-			CategoryName: item.CategoryName,
-
-			MPN:          item.Name,
-			RequestedMPN: requestedMPN,
-			RequestedQty: requestedQty,
-
-			Manufacturer: item.ProducerName,
-			Description:  item.Description,
-			ImageURL:     item.PhotoURL,
-
-			SellerName:     "Promelec",
-			SellerHomepage: "https://promelec.ru",
-			SellerVerified: true,
-
-			Stock:    item.Quant,
-			Status:   "Найдено",
-			Price:    basePrice,
-			Currency: "RUB",
-
-			PriceBreaks: priceBreaks,
-			Source:      "promelec",
-		})
 	}
 
 	return offers
@@ -237,4 +268,25 @@ func buildPriceBreaks(priceBreaks []types.PriceBreak, currency string) []types.U
 	}
 
 	return result
+}
+
+func formatDeliveryTime(days int, defaultValue string) string {
+	if days <= 0 {
+		return defaultValue
+	}
+
+	if days <= 7 {
+		return "1-2 недели"
+	}
+
+	weeks := float64(days) / 7.0
+
+	minWeeks := int(weeks)
+	maxWeeks := minWeeks + 1
+
+	if days%7 == 0 {
+		return fmt.Sprintf("%d недели", minWeeks)
+	}
+
+	return fmt.Sprintf("%d-%d недели", minWeeks, maxWeeks)
 }

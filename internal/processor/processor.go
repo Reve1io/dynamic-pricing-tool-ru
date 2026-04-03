@@ -84,7 +84,7 @@ func (p *Processor) worker(ctx context.Context, jobs <-chan types.PartData, resu
 			offers := []types.UnifiedOffer{}
 
 			offers = append(offers, FormatGetchipsData(apiResult.GetchipsData, part.PartNumber, qty)...)
-			offers = append(offers, FormatEfindData(apiResult.EfindData, part.PartNumber, qty)...)
+			//offers = append(offers, FormatEfindData(apiResult.EfindData, part.PartNumber, qty)...)
 			offers = append(offers, FormatPromelecData(apiResult.PromelecData, part.PartNumber, qty)...)
 
 			for _, o := range offers {
