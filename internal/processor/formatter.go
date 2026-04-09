@@ -56,7 +56,7 @@ func FormatGetchipsData(raw *types.GetchipsResponse, requestedMPN string, reques
 			RequestedQty: requestedQty,
 
 			Manufacturer:   d.Brand,
-			SellerName:     d.Brand,
+			SellerName:     "Getchips",
 			SellerVerified: true,
 
 			Stock:        d.Quantity,
